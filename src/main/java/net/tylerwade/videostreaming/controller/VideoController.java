@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import reactor.core.publisher.Mono;
 
 import java.io.IOException;
@@ -24,48 +25,24 @@ public class VideoController {
 	private final VideoService videoService;
 
 	@GetMapping("/{fileName}")
-	public Mono<ResponseEntity<byte[]>> getVideo(@PathVariable String fileName,
-												 @RequestHeader(value = "Range", required = false) String rangeHeader) throws IOException {
+	public Mono<ResponseEntity<StreamingResponseBody>> getVideo(@PathVariable String fileName,
+																@RequestHeader(value = "Range", required = false) String rangeHeader) throws IOException {
+		Content content = videoService.getVideoContent(fileName, rangeHeader);
 
-		Long[] parsedRange = parseRange(rangeHeader);
-		Content content = videoService.getVideoContent(fileName, parsedRange[0], parsedRange[1]);
-
-		boolean isCompleteContent = content.getStart() == 0 && content.getEnd() == content.getContentLength() - 1;
+		boolean isCompleteContent = content.getRange().start() == 0 && content.getRange().end() == content.getFileSize() - 1;
 
 		return Mono.just(ResponseEntity.status(isCompleteContent ? 200 : 206)
-				.header("Content-Type", "video/" + content.getContentType())
+				.header("Content-Type", content.getContentType())
 				.header("Accept-Ranges", "bytes")
-				.header("Content-Length", String.valueOf(content.getContent().length))
+				.header("Content-Length", String.valueOf(content.getContentLength()))
 				.header("Content-Range", String.format(
 						"bytes %s-%s/%s",
-						content.getStart(), content.getEnd(), content.getContentLength())
+						content.getRange().start(), content.getRange().end(), content.getFileSize())
 				).body(content.getContent())
 		);
 	}
 
-	private Long[] parseRange(String range) {
-		if (range == null || !range.startsWith("bytes=")) {
-			return new Long[] {null, null};
-		}
 
-		String rangeValues = range.substring("bytes=".length());
-		String[] rangeParts = rangeValues.split("-");
-		Long start = 0L;
-		Long end = null;
-
-		try {
-			if (rangeParts.length > 0 && !rangeParts[0].isEmpty()) {
-				start = Long.parseLong(rangeParts[0]);
-			}
-			if (rangeParts.length > 1 && !rangeParts[1].isEmpty()) {
-				end = Long.parseLong(rangeParts[1]);
-			}
-		} catch (NumberFormatException e) {
-			// Fallback to defaults if parsing fails.
-			log.warn("Parsing failed for range values {}", rangeValues);
-		}
-		return new Long[] {start, end};
-	}
 
 	@GetMapping
 	public List<Content> getAllVideosMetadata() {
