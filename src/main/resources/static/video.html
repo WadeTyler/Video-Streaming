@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Video</title>
+
+  <style>
+      body {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          height: 100vh;
+          background: black;
+      }
+
+      h1 {
+          color: white;
+      }
+
+      video {
+          width: 100%;
+          height: 100%;
+      }
+
+      button {
+          position: absolute;
+          top: 2rem;
+          left: 2rem;
+          z-index: 1000;
+      }
+  </style>
+</head>
+<body>
+
+
+<script>
+  const urlParams = new URLSearchParams(window.location.search);
+  const videoFileName = urlParams.get('video');
+
+  function storeCurrentTime() {
+      const video = document.getElementById("video");
+      if (video) {
+          const video = document.getElementById("video");
+          localStorage.setItem(`${videoFileName}-currentTime`, video.currentTime);
+          console.log(`Current Time: ${videoFileName}-currentTime=${video.currentTime}`);
+      }
+  }
+
+  window.addEventListener('unload', storeCurrentTime);
+
+  function loadVideo(fileName) {
+      const videoEl = document.createElement("video");
+      videoEl.id = "video";
+      videoEl.src = `/api/v1/videos/${fileName}`;
+      videoEl.controls = true;
+      videoEl.autoplay = true;
+
+      videoEl.addEventListener('error', () => {
+          document.body.innerHTML = "<h1>Something went wrong or video not found.</h1>";
+      });
+
+      // Check if currentTime present
+      videoEl.addEventListener('loadedmetadata', () => {
+          console.log("Video metadata loaded!");
+          console.log("Duration: ", videoEl.duration);
+
+          const currentTime = localStorage.getItem(`${videoFileName}-currentTime`);
+          if (currentTime) {
+              if (currentTime >= videoEl.duration) {
+                  console.log("Current time is greater than video duration. Resetting currentTime to 0");
+                  videoEl.currentTime = 0;
+              } else {
+                  console.log(`Restoring currentTime: ${currentTime}`);
+                  videoEl.currentTime = parseFloat(currentTime);
+              }
+          }
+      });
+
+      document.body.appendChild(videoEl);
+
+      const backBtn = document.createElement("button");
+      backBtn.innerHTML = "Back";
+      backBtn.onclick = () => window.location.href = "/";
+      document.body.appendChild(backBtn);
+  }
+
+  if (!videoFileName) {
+      document.body.innerHTML = "<h1>No video provided</h1>";
+  } else {
+    loadVideo(videoFileName);
+  }
+
+</script>
+</body>
+</html>
